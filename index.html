@@ -142,6 +142,9 @@ h1,h2,h3{font-family:var(--display); text-wrap:balance}
 @media (max-width:1100px){ .media{position:static} }
 .media .mat{background:var(--card); border:1px solid var(--rule-2); border-radius:6px; padding:10px; box-shadow:0 1px 0 var(--rule-2), 0 12px 24px -18px rgba(60,40,15,.45)}
 .media img{display:block; width:100%; height:auto; border-radius:3px; max-height:440px; object-fit:contain; background:var(--panel)}
+.media.stack{position:static; gap:18px}
+.media.stack .viz-stage{aspect-ratio:16/10}
+.viz-title{font-family:var(--display); font-weight:600; font-size:.9rem; color:var(--ink); margin:0 0 8px; line-height:1.3}
 .media figcaption{font-family:var(--mono); font-size:.7rem; color:var(--ink-3); margin-top:8px; line-height:1.5}
 .media figcaption b{color:var(--ink-2); font-weight:500}
 .viz-stage{position:relative; width:100%; aspect-ratio:4/3; max-width:100%; border-radius:3px; background:var(--viz-bg); overflow:hidden; touch-action:none; cursor:grab}
@@ -690,7 +693,7 @@ footer a:hover{color:var(--copper)}
         </div>
       </div>
 
-      <figure class="media"><div class="mat"><div class="viz-stage" data-viz="piano" role="img" aria-label="Breadboard piano model with five playable keys"><div class="viz-hud"></div></div><div class="viz-ctl"></div><figcaption><b>Interactive.</b> Click a key to play the sketch’s tone frequencies. Drag to rotate.</figcaption></div></figure>
+      <figure class="media stack"><div class="mat"><p class="viz-title">Thermostat simulator</p><div class="viz-stage" data-viz="thermo" role="img" aria-label="Thermostat model with LCD, setpoint buttons and heater, fan and AC LEDs"><div class="viz-hud"></div></div><div class="viz-ctl"></div><figcaption><b>Interactive.</b> Press a setpoint button: each fires an interrupt and the contact bounces are ignored. The LEDs blink at the report’s thresholds (65, 70 and 72 °F). Drag to rotate.</figcaption></div><div class="mat"><p class="viz-title">Light-tracking servo scanner</p><div class="viz-stage" data-viz="servo" role="img" aria-label="Servo sweeping a photoresistor past a lamp, with a brightness bar for each angle"><div class="viz-hud"></div></div><div class="viz-ctl"></div><figcaption><b>Interactive.</b> The servo sweeps 180° logging brightness 0 to 100, then returns to the brightest angle. Move the lamp and it rescans. Drag to rotate.</figcaption></div><div class="mat"><p class="viz-title">Joystick motor speed and direction control</p><div class="viz-stage" data-viz="joy" role="img" aria-label="Joystick driving a fan motor through an H-bridge"><div class="viz-hud"></div></div><div class="viz-ctl"></div><figcaption><b>Interactive.</b> Push the stick: the sign sets the H-bridge direction and the size sets the PWM duty, so the fan reverses and speeds up. Drag to rotate.</figcaption></div><div class="mat"><p class="viz-title">Counter numeric display</p><div class="viz-stage" data-viz="counter" role="img" aria-label="Seven-segment counter with a button and buzzer"><div class="viz-hud"></div></div><div class="viz-ctl"></div><figcaption><b>Interactive.</b> Hold the button to count 0 to 9 with the tone rising 100 Hz per digit. Let go and the decimal point flashes three times. Drag to rotate.</figcaption></div><div class="mat"><p class="viz-title">Five-key breadboard piano</p><div class="viz-stage" data-viz="piano" role="img" aria-label="Breadboard piano model with five playable keys"><div class="viz-hud"></div></div><div class="viz-ctl"></div><figcaption><b>Interactive.</b> Click a key to play the sketch’s tone frequencies. Drag to rotate.</figcaption></div></figure>
     </article>
   </section>
   </div>
@@ -856,7 +859,7 @@ var live = [];          // started models: {stage, tick(dt,t), visible}
 var started = new WeakMap();
 
 function hud(stage, html){ var h = stage.querySelector(".viz-hud"); if (h) h.innerHTML = html; }
-function ctl(stage){ return stage.parentElement.parentElement.querySelector(".viz-ctl"); }
+function ctl(stage){ return stage.parentElement.querySelector(".viz-ctl"); }
 function button(stage, label, onClick, pressed){
   var b = document.createElement("button"); b.type = "button"; b.textContent = label;
   if (pressed !== undefined) b.setAttribute("aria-pressed", pressed ? "true" : "false");
@@ -930,6 +933,24 @@ function digit(v, x, z, s){
   });
   return function(ch){ var on = SEG[String(ch).toLowerCase()] || ""; Object.keys(segs).forEach(function(k){ glow(segs[k], on.indexOf(k) >= 0, RED); }); };
 }
+
+/* ---- shared bits for the Arduino models ---- */
+var AUDIO = null;
+function beep(f, d){ try { AUDIO = AUDIO || new (window.AudioContext || window.webkitAudioContext)(); var o = AUDIO.createOscillator(), g = AUDIO.createGain();
+  o.type = "square"; o.frequency.value = f; g.gain.value = .03; o.connect(g); g.connect(AUDIO.destination); o.start(); o.stop(AUDIO.currentTime + (d || .15)); } catch(e){} }
+function uno(v, x, z){
+  v.box(2.7, .08, 2.0, 0x1d7a8a, x, .04, z);
+  v.box(.7, .4, .6, 0xb8bcc0, x - 1.2, .24, z - .55, {metalness:.6, roughness:.3});      // USB jack
+  v.box(2.0, .18, .12, 0x1b1b1b, x + .2, .17, z - .9); v.box(1.6, .18, .12, 0x1b1b1b, x + .3, .17, z + .9);
+  v.box(.7, .1, .7, 0x222222, x + .3, .13, z);
+}
+function breadboard(v, w, d, x, z){ v.box(w, .2, d, 0xf3efe6, x, .1, z, {roughness:.9}); v.box(w, .02, .05, 0xc0392b, x, .21, z - d/2 + .12); v.box(w, .02, .05, 0x2f5fa8, x, .21, z + d/2 - .12); }
+function textPlane(v, w, h, res){
+  var c = document.createElement("canvas"); c.width = res; c.height = Math.round(res*h/w);
+  var tex = new THREE.CanvasTexture(c), m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({map:tex}));
+  v.root.add(m); return {mesh:m, g:c.getContext("2d"), c:c, done:function(){ tex.needsUpdate = true; }};
+}
+function soundToggle(stage){ var on = {v:false}; var b = button(stage, "Sound off", function(){ on.v = !on.v; b.textContent = on.v ? "Sound on" : "Sound off"; b.setAttribute("aria-pressed", on.v ? "true" : "false"); }, false); return on; }
 
 var MODELS = {
 
@@ -1176,9 +1197,135 @@ gate: function(stage){
   };
 },
 
+/* Thermostat simulator: setpoint buttons on interrupt pins with millis() debounce, LEDs from the report's thresholds */
+thermo: function(stage){
+  var v = three(stage, {dist:9.6, pitch:1.0, yaw:.1, drift:false, target:new THREE.Vector3(.3,0,.1)});
+  uno(v, -2.3, .2); breadboard(v, 4.0, 2.6, 1.6, .2);
+  v.box(2.6, .14, 1.1, 0x2c6b3a, 1.4, .3, -.55);                                            // LCD module
+  var lcd = textPlane(v, 2.2, .7, 512); lcd.mesh.rotation.x = -Math.PI/2; lcd.mesh.position.set(1.4, .38, -.55);
+  v.box(.45, .5, .35, 0x3a7fc0, 3.2, .45, -.55);                                              // DHT temperature/humidity sensor
+  var LED = [[RED, "heater"], [AMBER, "fan"], [0x3a7fd8, "AC"]], leds = LED.map(function(l, i){ v.cyl(.04, .3, 0x9a9488, .5 + i*.6, .35, .6); return v.cyl(.14, .26, 0x3a3530, .5 + i*.6, .5, .6, {emissive:0x000000}); });
+  var set = 70, ok = 0, ignored = 0, last = -1e9, t = 0, note = "press a setpoint button";
+  function isr(d, pin){
+    var now = performance.now();
+    if (now - last < 200){ ignored++; note = "pin " + pin + ": edge inside the debounce window, ignored"; return; }
+    last = now; ok++; set += d; ignored += 2; note = "pin " + pin + " ISR: setpoint " + (d > 0 ? "+1" : "−1") + ", 2 contact bounces ignored";
+  }
+  var bu = v.box(.4, .16, .4, 0x2a2724, 2.4, .3, .7), bd = v.box(.4, .16, .4, 0x2a2724, 3.1, .3, .7);
+  v.clickable(bu, function(){ isr(1, 19); }); v.clickable(bd, function(){ isr(-1, 20); });
+  button(stage, "Setpoint −", function(){ isr(-1, 20); }); button(stage, "Setpoint +", function(){ isr(1, 19); });
+  var shown = "";
+  return function(dt){
+    t += dt; var blink = Math.floor(t*2) % 2 === 0;
+    var on = set >= 72 ? [1,1,0] : set <= 65 ? [0,1,1] : set < 70 ? [0,1,0] : [0,0,0];
+    var mode = set >= 72 ? "HEAT + FAN" : set <= 65 ? "AC + FAN" : set < 70 ? "FAN" : "IDLE";
+    leds.forEach(function(m, i){ glow(m, on[i] && blink, LED[i][0]); });
+    var txt = "SET POINT " + set + "F|" + mode;
+    if (txt !== shown){ shown = txt; var g = lcd.g, w = lcd.c.width, h = lcd.c.height;
+      g.fillStyle = "#a9c94f"; g.fillRect(0, 0, w, h); g.fillStyle = "#1f2a12"; g.font = "bold 46px 'IBM Plex Mono', monospace"; g.textBaseline = "middle";
+      g.fillText(txt.split("|")[0], 22, h*.3); g.fillText(txt.split("|")[1], 22, h*.72); lcd.done(); }
+    hud(stage, "setpoint <b>" + set + " °F</b> · interrupts accepted <b>" + ok + "</b> · bounces ignored <b>" + ignored + "</b><br>" + note);
+    v.frame(dt);
+  };
+},
+
+/* Light-tracking servo scanner: 180-degree sweep, brightness mapped 0-100, return to the brightest angle */
+servo: function(stage){
+  var v = three(stage, {dist:10.8, pitch:.8, yaw:.0, target:new THREE.Vector3(0,.3,-.5)});
+  v.box(8, .1, 5, 0xa8977a, 0, -.05, -1, {roughness:1});
+  uno(v, -2.6, 1.4); breadboard(v, 1.6, 1.0, 2.6, 1.4); v.cyl(.18, .25, 0x1b1b1b, 2.6, .32, 1.4);   // buzzer
+  v.box(.9, .7, .5, 0x2f5fa8, 0, .35, 0);                                                          // SG90 body
+  var horn = new THREE.Group(); horn.position.set(0, .78, 0); v.root.add(horn);
+  var arm = new THREE.Mesh(new THREE.BoxGeometry(1.5, .06, .16), new THREE.MeshStandardMaterial({color:0xf2f0ea})); arm.position.x = .75; horn.add(arm);
+  var pcb = new THREE.Mesh(new THREE.BoxGeometry(.4, .3, .06), new THREE.MeshStandardMaterial({color:0xf3efe6})); pcb.position.set(1.5, .15, 0); horn.add(pcb);
+  var ldr = new THREE.Mesh(new THREE.CylinderGeometry(.09, .09, .04, 16), new THREE.MeshStandardMaterial({color:0xb5562a})); ldr.rotation.z = Math.PI/2; ldr.position.set(1.72, .18, 0); horn.add(ldr);
+  var lamp = new THREE.Mesh(new THREE.SphereGeometry(.28, 20, 14), new THREE.MeshStandardMaterial({color:0xffe9a8, emissive:0xffd060, emissiveIntensity:1})); v.root.add(lamp);
+  var R = 2.5, bars = [];
+  for (var a = 0; a <= 180; a += 6){ var r = a*Math.PI/180, b = v.box(.12, 1, .12, 0x93511b, R*Math.cos(r), .5, -R*Math.sin(r)); b.scale.y = .01; bars.push({a:a, m:b}); }
+  var L = 120, ang = 0, phase = "scan", data = [], best = 0, hold = 0, snd = null;
+  function bright(a){ return Math.round(6 + 94*Math.exp(-Math.pow((a - L)/24, 2))); }
+  function rescan(){ ang = 0; phase = "scan"; data = []; best = 0; bars.forEach(function(b){ b.m.scale.y = .01; b.m.position.y = .005; }); }
+  slider(stage, "Lamp angle", 10, 170, L, 1, function(x){ L = x; rescan(); });
+  button(stage, "Rescan", rescan); snd = soundToggle(stage);
+  return function(dt){
+    var r = L*Math.PI/180; lamp.position.set(3.4*Math.cos(r), .8, -3.4*Math.sin(r));
+    if (phase === "scan"){
+      var n = Math.min(180, ang + dt*45);
+      for (var d = Math.floor(ang); d <= Math.floor(n); d++) if (data[d] === undefined){ data[d] = bright(d); if (data[d] > data[best]) best = d; }
+      ang = n; if (ang >= 180) phase = "return";
+    } else if (phase === "return"){
+      ang = Math.max(best, ang - dt*90); if (ang <= best){ phase = "hold"; if (snd.v) beep(200 + data[best]*10, .4); }
+    }
+    horn.rotation.y = ang*Math.PI/180;
+    bars.forEach(function(b){ if (data[b.a] !== undefined){ var h = .05 + data[b.a]/100*1.6; b.m.scale.y = h; b.m.position.y = h/2; b.m.material.color.setHex(b.a === Math.round(best/6)*6 && phase === "hold" ? 0x2c5a4a : 0x93511b); } });
+    var cur = data[Math.floor(ang)];
+    hud(stage, (phase === "scan" ? "scanning" : phase === "return" ? "returning to brightest" : "parked at brightest") + " · angle <b>" + Math.round(ang) + "°</b> · brightness <b>" + (cur === undefined ? "–" : cur) + " / 100</b><br>best so far <b>" + best + "°</b> (" + (data[best] || 0) + ") · tone pitch follows brightness");
+    v.frame(dt);
+  };
+},
+
+/* Joystick motor control: map() to a signed position, sign picks the H-bridge direction, size sets the PWM duty */
+joy: function(stage){
+  var v = three(stage, {dist:9.8, pitch:.8, yaw:.35, target:new THREE.Vector3(.4,0,0)});
+  uno(v, -2.4, .9); breadboard(v, 3.0, 2.0, 1.2, .9);
+  v.box(.8, .16, .8, 0x1b1b1b, -2.4, .1, -1.3);                                                     // joystick module
+  var stick = new THREE.Group(); stick.position.set(-2.4, .2, -1.3); v.root.add(stick);
+  var shaft = new THREE.Mesh(new THREE.CylinderGeometry(.06, .06, .7, 12), new THREE.MeshStandardMaterial({color:0x444444})); shaft.position.y = .35; stick.add(shaft);
+  var knob = new THREE.Mesh(new THREE.SphereGeometry(.2, 16, 12), new THREE.MeshStandardMaterial({color:0x2a2724})); knob.position.y = .72; stick.add(knob);
+  v.box(.8, .14, .35, 0x1b1b1b, 1.0, .28, .9); var in1 = v.box(.12, .1, .12, 0x3a3530, .7, .4, 1.3, {emissive:0x000000}), in2 = v.box(.12, .1, .12, 0x3a3530, 1.3, .4, 1.3, {emissive:0x000000});
+  v.box(.55, .9, .3, 0x2a2724, 3.3, .45, .9); v.box(.55, .12, .3, 0x93511b, 3.3, .96, .9);           // 9 V battery
+  var motor = v.cyl(.38, .8, 0xb8bcc0, 1.4, .5, -1.4, {metalness:.6, roughness:.3}); motor.rotation.z = Math.PI/2;
+  var fan = new THREE.Group(); fan.position.set(.85, .5, -1.4); v.root.add(fan);
+  for (var k = 0; k < 3; k++){ var bl = new THREE.Mesh(new THREE.BoxGeometry(.04, .9, .22), new THREE.MeshStandardMaterial({color:0xc0392b})); bl.position.y = .45; var arm = new THREE.Group(); arm.rotation.x = k*2*Math.PI/3; arm.add(bl); fan.add(arm); }
+  var pos = 0;
+  slider(stage, "Joystick", -100, 100, 0, 1, function(x){ pos = x; });
+  button(stage, "Centre", function(){ pos = 0; var r = ctl(stage).querySelector("input"); if (r) r.value = 0; });
+  return function(dt){
+    stick.rotation.x = -pos/100*.55;
+    fan.rotation.x += pos/100*22*dt;
+    glow(in1, pos > 0, GREEN_LED); glow(in2, pos < 0, GREEN_LED);
+    var raw = Math.round((pos + 100)/200*1023), pwm = Math.round(Math.abs(pos)/100*255);
+    hud(stage, "analogRead <b>" + raw + "</b> → map() <b>" + (pos > 0 ? "+" : "") + pos + "</b><br>" + (pos === 0 ? "both inputs LOW, motor stopped" : (pos > 0 ? "IN1 HIGH, IN2 LOW" : "IN1 LOW, IN2 HIGH") + " · PWM <b>" + pwm + " / 255</b> (" + Math.abs(pos) + "%)"));
+    v.frame(dt);
+  };
+},
+
+/* Counter numeric display: hold to count 0-9 with a rising tone, release and the decimal point flashes three times */
+counter: function(stage){
+  var v = three(stage, {dist:8.4, pitch:.55, yaw:.25, drift:false, target:new THREE.Vector3(-.2,.5,.2)});
+  uno(v, -2.4, .4); breadboard(v, 3.4, 2.2, 1.4, .4);
+  v.box(1.2, 1.7, .25, 0x1d1b19, 1.0, .95, -.1);
+  var L = {a:[0,.55,1], b:[.28,.28,0], c:[.28,-.28,0], d:[0,-.55,1], e:[-.28,-.28,0], f:[-.28,.28,0], g:[0,0,1]}, segs = {};
+  Object.keys(L).forEach(function(k){ var p = L[k]; segs[k] = v.box(p[2] ? .44 : .09, p[2] ? .09 : .44, .04, 0x3a3530, 1.0 + p[0], .95 + p[1], .04, {emissive:0x000000}); });
+  var dp = v.box(.1, .1, .04, 0x3a3530, 1.45, .35, .04, {emissive:0x000000});
+  v.cyl(.25, .3, 0x1b1b1b, 2.5, .35, .9); var btn = v.box(.45, .2, .45, 0x2a2724, 2.6, .3, -.3); v.cyl(.12, .1, 0xc0392b, 2.6, .44, -.3);
+  var held = false, n = 0, acc = 0, idle = 0, flashes = 0, snd = null, finishing = false;
+  var hb = button(stage, "Hold button", function(){ toggle(); }, false);
+  function toggle(){ held = !held; hb.setAttribute("aria-pressed", held ? "true" : "false"); hb.textContent = held ? "Release button" : "Hold button"; if (!held) finishing = n !== 0; idle = 0; acc = 0; }
+  v.clickable(btn, toggle); snd = soundToggle(stage);
+  var BITS = "abcdefg";
+  return function(dt){
+    acc += dt; var dpOn = false;
+    if (held || finishing){
+      if (acc > .5){ acc = 0; n = (n + 1) % 10; if (snd.v) beep(100 + 100*n, .12); if (!held && n === 9) finishing = false; }
+      idle = 0;
+    } else {
+      idle += dt; var k = Math.floor(idle/.3);                       // three 300 ms flashes, then the 500 Hz alarm, then a pause
+      dpOn = k < 6 && k % 2 === 0;
+      if (k === 6 && idle - dt < 1.8 && snd.v) beep(500, .2);
+      if (idle > 3.2) idle = 0;
+    }
+    btn.position.y = held ? .24 : .3;
+    var on = SEG[n]; Object.keys(segs).forEach(function(k2){ glow(segs[k2], on.indexOf(k2) >= 0, RED); }); glow(dp, dpOn, RED);
+    var bits = BITS.split("").map(function(c){ return on.indexOf(c) >= 0 ? 1 : 0; }).join("");
+    hud(stage, "digit <b>" + n + "</b> · displaySegment <b>" + bits + "</b> (a–g)<br>" + (held ? "counting · tone <b>" + (100 + 100*n) + " Hz</b>" : finishing ? "released, finishing the count" : "idle · decimal point flashes 3×, then 500 Hz"));
+    v.frame(dt);
+  };
+},
+
 /* Arduino breadboard piano: the five tone() frequencies from the sketch */
 piano: function(stage){
-  var v = three(stage, {dist:7.5, pitch:.8, yaw:.15});
+  var v = three(stage, {dist:8.8, pitch:.8, yaw:.15});
   v.box(6.4, .2, 3, 0xf3efe6, 0, 0, 0, {roughness:.9});
   for (var r = 0; r < 10; r++) for (var c = 0; c < 30; c++) if ((r+c)%1 === 0 && Math.random() < .3) v.box(.04,.02,.04,0x9a9488,-2.9+c*.2,.11,-1.2+r*.26);
   var F = [262, 294, 330, 349, 392], keys = [], ac = null, last = "click a key (sound on)";
