@@ -198,7 +198,7 @@ footer a:hover{color:var(--copper)}
       <li><span>Bay Area, CA &nbsp;·&nbsp; U.S. Citizen</span></li>
     </ul>
     </div>
-    <div class="stamp"><b>17</b>projects, 13 with full written reports.<br>Chip layout, analog design, firmware and power.</div>
+    <div class="stamp"><b>17</b>projects, 14 with full written reports.<br>Chip layout, analog design, firmware and power.</div>
   </header>
 
   <div class="lede">
@@ -317,10 +317,13 @@ footer a:hover{color:var(--copper)}
           <li><strong>Building arithmetic from primitives.</strong> Half adder, then full adder, then a 4-bit ripple carry adder, modeling how carry propagates stage to stage. Ripple carry is the slow way to add, because each stage waits on the carry from the one below it, and seeing that delay accumulate in simulation is the reason carry-lookahead exists.</li>
           <li><strong>Getting it onto real pins.</strong> Everything above only matters if it reaches hardware, which means constraints files mapping logical signal names to physical FPGA pins for switches, buttons, LEDs and the seven-segment displays, then synthesis, implementation and bitstream generation.</li>
         </ul>
-        <p class="quiet">No demo footage survived from this one. It is listed because the work is real, and because the access controller is the project I would point at if you wanted to see whether I can decompose a system rather than just write modules.</p>
+        <p class="quiet">The access controller is the project I would point at if you wanted to see whether I can decompose a system rather than just write modules.</p>
+        <div class="proof">
+          <button type="button" data-pdf="Arjanveer-Samra-Parking-Lot-FSM-Final-Project.pdf">Final project report (PDF)</button>
+        </div>
       </div>
 
-      <figure class="media"><div class="mat"><div class="viz-stage" data-viz="gate" role="img" aria-label="Parking gate model with a passcode state machine, an occupancy counter and cars"><div class="viz-hud"></div></div><div class="viz-ctl"></div><figcaption><b>Interactive.</b> Gate opens only when the passcode FSM accepts and the lot has room. Press the keys, try a wrong digit, fill the lot. Drag to rotate.</figcaption></div></figure>
+      <figure class="media"><div class="mat"><div class="viz-stage" data-viz="gate" role="img" aria-label="Parking gate model with a passcode state machine, an occupancy counter and cars"><div class="viz-hud"></div></div><div class="viz-ctl"></div><figcaption><b>Interactive.</b> Cars queue at the gate, which lifts only when the passcode FSM accepts and the lot has room. The HEX display reads CLEAr0 when empty and FULL 3 at capacity. Press KEY <b>3 1 2 0</b>, fill the lot, let cars leave. Drag to rotate.</figcaption></div></figure>
     </article>
   </section>
   </div>
@@ -917,7 +920,7 @@ var PCB = 0x2c5a3e, COPPER = 0xc98a3a, CHIP = 0x23201c, SILK = 0xf1ead8, RED = 0
 function glow(mesh, on, color){ mesh.material.emissive.setHex(on ? (color||RED) : 0x000000); mesh.material.emissiveIntensity = on ? 1 : 0; mesh.material.color.setHex(on ? (color||RED) : 0x3a3530); }
 
 /* 7-segment digit built from boxes */
-var SEG = {0:"abcdef",1:"bc",2:"abdeg",3:"abcdg",4:"bcfg",5:"acdfg",6:"acdefg",7:"abc",8:"abcdefg",9:"abcdfg",a:"abcefg",b:"cdefg",c:"adef",d:"bcdeg",e:"adefg",f:"aefg","-":"g"," ":""};
+var SEG = {0:"abcdef",1:"bc",2:"abdeg",3:"abcdg",4:"bcfg",5:"acdfg",6:"acdefg",7:"abc",8:"abcdefg",9:"abcdfg",a:"abcefg",b:"cdefg",c:"adef",d:"bcdeg",e:"adefg",f:"aefg",l:"def",u:"bcdef",r:"eg","-":"g"," ":""};
 function digit(v, x, z, s){
   var L = {a:[0,0,-1,1], b:[1,0,-.5,0], c:[1,0,.5,0], d:[0,0,1,1], e:[-1,0,.5,0], f:[-1,0,-.5,0], g:[0,0,0,1]}, segs = {};
   Object.keys(L).forEach(function(k){
@@ -1065,43 +1068,109 @@ link: function(stage){
   };
 },
 
-/* Parking access controller: passcode FSM and occupancy counter must both agree before the gate opens */
+/* Parking lot after the DE1-SoC lab scene: cars queue at the gate, the passcode FSM and the occupancy counter must both agree */
 gate: function(stage){
-  var v = three(stage, {dist:9.6, pitch:.62, yaw:.62, target:new THREE.Vector3(0,.4,0)});
-  v.box(8, .1, 5, 0x6b6257, 0, 0, 0);
-  for (var i = 0; i < 6; i++) v.box(.5, .02, .12, 0xf2e6c8, -.6, .06, 2.2 - i*.9);           // lane dashes
-  v.box(.5, 1.4, .5, 0x2f3a5a, -2.2, .7, .2);
-  var arm = new THREE.Group(); arm.position.set(-2.2, 1.25, .2); v.root.add(arm);
-  var bar = new THREE.Mesh(new THREE.BoxGeometry(3.4, .14, .14), new THREE.MeshStandardMaterial({color:0xf2e6c8})); bar.position.x = 1.7; arm.add(bar);
-  for (var st2 = 0; st2 < 3; st2++){ var stripe = new THREE.Mesh(new THREE.BoxGeometry(.3, .15, .15), new THREE.MeshStandardMaterial({color:0xc0392b})); stripe.position.x = .6 + st2*1.1; arm.add(stripe); }
-  var lamp = v.box(.3, .3, .3, 0x3a3530, -2.2, 1.6, .2, {emissive:0x000000});
-  v.box(1.6, 1.0, .2, 0x1d1b19, 2.6, .6, -1.6);                                                // display panel
-  var occ = digit(v, 2.25, -1.48, 1.2), cap = digit(v, 2.95, -1.48, 1.2);
-  occ = (function(set){ return set; })(occ);
-  var states = []; for (var s0 = 0; s0 < 5; s0++) states.push(v.box(.36, .36, .36, 0x3a3530, -3.4 + s0*.75, .25, -2.1, {emissive:0x000000}));
-  var cars = [], CAP = 3, CODE = [3,1,2,0], st = 0, opened = 0, flashBad = 0, msg = "enter 3 1 2 0 (demo code)";
-  function car(){ var m = v.box(1.0, .55, 1.6, [0x8e3b2c,0x2f5d77,0x5b6b3a][cars.length % 3], .9, .35, 3.4); return {m:m, z:3.4, goal:3.4, inside:false}; }
+  var v = three(stage, {dist:15, pitch:.62, yaw:.5, target:new THREE.Vector3(-1,.3,.4)});
+  var T = THREE;
+  v.box(22, .1, 18, 0x6f8a4c, 0, -.06, 0, {roughness:1});                                     // grass
+  v.box(22, .12, 1.4, 0xb9b1a2, 0, 0, -4.2, {roughness:.95});                                   // sidewalk behind the lot
+  v.box(8.4, .1, 4.6, 0xb9b1a2, -.3, .01, -.9, {roughness:.95});                                 // curb
+  v.box(8.0, .1, 4.2, 0x3d3b39, -.3, .03, -.9);                                                  // lot asphalt
+  v.box(1.9, .1, 7.6, 0x3d3b39, 2.5, .03, 4.9);                                                  // entry road
+  for (var d = 0; d < 5; d++) v.box(.08, .02, .5, 0xf2e6c8, 2.5, .09, 2.4 + d*1.2);              // lane divider
+  var SX = [-3.4, -2.0, -.6], SZ = -1.9;
+  SX.forEach(function(x){ v.box(1.2, .02, .06, 0xf2f0ea, x, .09, SZ - .95); v.box(.06, .02, 1.9, 0xf2f0ea, x - .6, .09, SZ); v.box(.06, .02, 1.9, 0xf2f0ea, x + .6, .09, SZ); });
+  // buildings in the back, like the lab's campus backdrop
+  v.box(6.2, 2.0, 1.8, 0x7a3f2c, -3.6, 1.0, -6.4, {roughness:.9});
+  for (var w = 0; w < 9; w++) for (var r = 0; r < 2; r++) v.box(.36, .42, .05, 0x2a2a30, -6.2 + w*.65, .65 + r*.8, -5.47);
+  v.box(1.9, 3.0, 1.9, 0x6f8799, 2.6, 1.5, -6.6, {roughness:.3, metalness:.3});
+  v.box(1.4, 2.6, 1.6, 0xd9d2c4, 4.2, 1.3, -6.5);
+  // guard booth, barrier, sensor pole, P sign
+  v.box(1.0, 1.0, 1.0, 0xc8b89a, 4.1, .5, 2.0); v.box(1.2, .12, 1.2, 0x8a4b2a, 4.1, 1.06, 2.0);
+  v.box(.3, .9, .3, 0x9a2f22, 3.55, .45, 1.6);
+  var arm = new T.Group(); arm.position.set(3.55, .85, 1.6); v.root.add(arm);
+  var bar = new T.Mesh(new T.BoxGeometry(2.0, .1, .1), new T.MeshStandardMaterial({color:0xf2e6c8})); bar.position.x = -1.0; arm.add(bar);
+  for (var k2 = 0; k2 < 3; k2++){ var sp = new T.Mesh(new T.BoxGeometry(.22, .11, .11), new T.MeshStandardMaterial({color:0xc0392b})); sp.position.x = -.35 - k2*.6; arm.add(sp); }
+  v.box(.06, 1.4, .06, 0x2a2724, 1.35, .7, 2.6); var lamp = v.box(.2, .2, .2, 0x3a3530, 1.35, 1.45, 2.6, {emissive:0x000000});
+  v.box(.06, 1.2, .06, 0x2a2724, 4.0, .6, 3.2); v.box(.42, .42, .05, 0x2f5fa8, 4.0, 1.35, 3.2);
+  v.box(.26, .3, .06, 0xf2f0ea, 4.0, 1.35, 3.23);
+  // HEX display board, as on the DE1-SoC: CLEAr0 / count / FULL 3, plus the FSM state lamps
+  var board = new T.Group(); board.position.set(-5.6, 1.25, .2); board.rotation.y = .75; v.root.add(board);
+  [-1.85, 1.25].forEach(function(px){ var post = new T.Mesh(new T.BoxGeometry(.08, 1.25, .08), new T.MeshStandardMaterial({color:0x2a2724})); post.position.set(px, -.62, -.02); board.add(post); });
+  var plate = new T.Mesh(new T.BoxGeometry(3.3, 1.0, .12), new T.MeshStandardMaterial({color:0x1d1b19})); plate.position.x = -.3; board.add(plate);
+  function vdigit(x){
+    var segs = {}, L = {a:[0,.27,1], b:[.13,.135,0], c:[.13,-.135,0], d:[0,-.27,1], e:[-.13,-.135,0], f:[-.13,.135,0], g:[0,0,1]};
+    Object.keys(L).forEach(function(k){ var p = L[k], m = new T.Mesh(new T.BoxGeometry(p[2] ? .22 : .05, p[2] ? .05 : .22, .04), new T.MeshStandardMaterial({color:0x3a3530, emissive:0x000000}));
+      m.position.set(x + p[0], .1 + p[1], .08); board.add(m); segs[k] = m; });
+    return function(ch){ var on = SEG[String(ch).toLowerCase()] || ""; Object.keys(segs).forEach(function(k){ glow(segs[k], on.indexOf(k) >= 0, RED); }); };
+  }
+  var hex = []; for (var h = 0; h < 6; h++) hex.push(vdigit(-1.55 + h*.5));
+  var lamps = []; for (var l = 0; l < 5; l++){ var lm = new T.Mesh(new T.BoxGeometry(.12, .08, .04), new T.MeshStandardMaterial({color:0x3a3530, emissive:0x000000})); lm.position.set(-1.55 + l*.3, -.36, .08); board.add(lm); lamps.push(lm); }
+  // cars follow polylines through the gate and back into a space
+  var COLORS = [0xe8c547, 0xc0392b, 0xf0eee8, 0x2f5d77], ncar = 0;
+  function makeCar(){
+    var g = new T.Group(), c = COLORS[ncar++ % COLORS.length];
+    var body = new T.Mesh(new T.BoxGeometry(.7, .28, 1.3), new T.MeshStandardMaterial({color:c, roughness:.4})); body.position.y = .26; g.add(body);
+    var cab = new T.Mesh(new T.BoxGeometry(.6, .24, .66), new T.MeshStandardMaterial({color:0x2a3138, roughness:.2, metalness:.3})); cab.position.set(0, .5, .08); g.add(cab);
+    var top = new T.Mesh(new T.BoxGeometry(.62, .05, .6), new T.MeshStandardMaterial({color:c})); top.position.set(0, .64, .08); g.add(top);
+    v.root.add(g); return {g:g, path:null, s:0, done:null, slot:-1};
+  }
+  function go(car, pts, done){ car.path = pts; car.s = 0; car.done = done; }
+  function step(car, dt){
+    if (!car.path) return;
+    car.s += dt * 2.6; var s = car.s, p = car.path;
+    for (var i = 0; i < p.length - 1; i++){
+      var dx = p[i+1][0] - p[i][0], dz = p[i+1][1] - p[i][1], len = Math.hypot(dx, dz);
+      if (s <= len){ car.g.position.set(p[i][0] + dx*s/len, 0, p[i][1] + dz*s/len); car.g.rotation.y = Math.atan2(dx, dz) + Math.PI; return; }
+      s -= len;
+    }
+    var e = p[p.length-1]; car.g.position.set(e[0], 0, e[1]); var f = car.done; car.path = null; car.done = null; if (f) f();
+  }
+  var CAP = 3, CODE = [3,1,2,0], st = 0, opened = 0, flashBad = 0, cars = [], waiting = null, slots = [null, null, null], msg = "";
+  var IN_X = 2.1, OUT_X = 2.9, LANE_Z = .35;
+  function arrive(){
+    if (waiting) { msg = "a car is already waiting at the gate"; return; }
+    var c = makeCar(); cars.push(c); c.g.position.set(IN_X, 0, 9);
+    waiting = c; c.arriving = true; go(c, [[IN_X, 9], [IN_X, 3.1]], function(){ c.arriving = false; msg = "car at the gate: enter <b>3 1 2 0</b>"; });
+    msg = "car arriving";
+  }
   function key(k){
     if (opened > 0) return;
-    if (k === CODE[st]){ st++; msg = "digit " + k + " accepted → S" + st; }
-    else { st = k === CODE[0] ? 1 : 0; flashBad = .5; msg = "wrong digit → back to S" + st; }
+    if (k === CODE[st]){ st++; msg = "KEY " + k + " accepted → S" + st; }
+    else { st = k === CODE[0] ? 1 : 0; flashBad = .5; msg = "wrong key → back to S" + st; }
     if (st === 4){
-      var inside = cars.filter(function(c){ return c.inside; }).length;
-      if (inside < CAP){ opened = 3.2; var c = car(); c.goal = -1.6 - inside*.0; cars.push(c); c.inside = true; msg = "S4 accept and " + inside + " < " + CAP + " → gate opens"; }
-      else { msg = "code right, lot full (" + inside + "/" + CAP + ") → gate stays shut"; flashBad = .8; }
+      var inside = slots.filter(Boolean).length;
+      if (!waiting) msg = "code accepted, but no car at the gate";
+      else if (inside >= CAP){ msg = "code right, lot FULL 3 → gate stays shut"; flashBad = .8; }
+      else {
+        var i = slots.indexOf(null), c = waiting; slots[i] = c; c.slot = i; waiting = null; opened = 2.8;
+        go(c, [[IN_X, c.g.position.z], [IN_X, LANE_Z], [SX[i], LANE_Z], [SX[i], SZ + .1]], null);
+        msg = "S4 accept and " + inside + " < " + CAP + " → gate opens";
+      }
       setTimeout(function(){ st = 0; }, 900);
     }
   }
-  [0,1,2,3].forEach(function(k){ button(stage, "Key " + k, function(){ key(k); }); });
-  button(stage, "Car leaves", function(){ var c = cars.filter(function(x){ return x.inside; })[0]; if (!c) return; c.inside = false; c.goal = -6; msg = "car left → counter decrements"; });
+  function leave(){
+    var c = slots.filter(Boolean).filter(function(x){ return !x.path; })[0];
+    if (!c){ msg = "no parked car to leave"; return; }
+    slots[c.slot] = null;
+    go(c, [[SX[c.slot], SZ + .1], [SX[c.slot], LANE_Z - .1], [OUT_X, LANE_Z - .1], [OUT_X, 9]], function(){ v.root.remove(c.g); cars.splice(cars.indexOf(c), 1); });
+    msg = "exit sensor → counter decrements";
+  }
+  [3,2,1,0].forEach(function(k){ button(stage, "KEY " + k, function(){ key(k); }); });
+  button(stage, "Car arrives", arrive);
+  button(stage, "Car leaves", leave);
+  arrive(); msg = "car arriving: enter <b>3 1 2 0</b>";
   return function(dt){
-    var inside = cars.filter(function(c){ return c.inside; }).length;
+    cars.forEach(function(c){ step(c, dt); });
     if (opened > 0) opened -= dt;
-    var tgt = opened > 0 ? -1.35 : 0; arm.rotation.z += (-tgt - arm.rotation.z) * Math.min(1, dt*5);
-    cars.forEach(function(c, i){ var lane = c.inside ? -1.6 + (cars.indexOf(c) % 3)*0 : c.goal; c.z += ((c.inside ? -1.6 - (i%3)*.0 : c.goal) - c.z) * Math.min(1, dt*1.4); c.m.position.z = c.z; c.m.position.x = c.inside ? .9 + ((i % 3) - 1)*1.1 * (c.z < 0 ? 1 : 0) : .9; c.m.visible = c.z > -5.5; });
-    states.forEach(function(m, i){ glow(m, i === st, i === 4 ? GREEN_LED : AMBER); });
-    if (flashBad > 0){ flashBad -= dt; glow(lamp, true, RED); } else glow(lamp, opened > 0, GREEN_LED);
-    occ(inside); cap(CAP);
+    var crossing = cars.some(function(c){ var p = c.g.position; return c.path && !c.arriving && p.z > .7 && p.z < 3.0; });
+    var up = opened > 0 || crossing;
+    arm.rotation.z += ((up ? -1.35 : 0) - arm.rotation.z) * Math.min(1, dt*5);
+    var inside = slots.filter(Boolean).length, text = inside === 0 ? "CLEAr0" : inside >= CAP ? "FULL 3" : "     " + inside;
+    hex.forEach(function(set, i){ set(text[i]); });
+    lamps.forEach(function(m, i){ glow(m, i === st, i === 4 ? GREEN_LED : AMBER); });
+    if (flashBad > 0){ flashBad -= dt; glow(lamp, true, RED); } else glow(lamp, up || inside < CAP, up || inside < CAP ? GREEN_LED : RED);
     hud(stage, "passcode FSM <b>S" + st + "</b> &nbsp;·&nbsp; occupancy <b>" + inside + " / " + CAP + "</b><br>" + msg);
     v.frame(dt);
   };
